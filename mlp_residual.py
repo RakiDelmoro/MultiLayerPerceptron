@@ -20,7 +20,8 @@ def residual_mlp_network(feature_sizes: list, input_feature_size: int, device: s
     parameters.extend([output_layer_w, output_layer_b])
 
     def pull_feature_from_layer_outputs(layer_outputs: list):
-        layer_output_idx_to_be_pulled = [0 if i == 0 else 2 * 2**(i-1) for i in range(len(layer_outputs))]
+        # [0, 2, 4, 8, 16, 32, 64, 128]
+        layer_output_idx_to_be_pulled = [0 if i == 0 else 2 * 2**(i-1) for i in range(8)]
         previous_layer_output = []
         for layer_output_idx, layer_output in enumerate(layer_outputs):
             is_layer_output_to_be_pulled = layer_output_idx in layer_output_idx_to_be_pulled
@@ -29,13 +30,13 @@ def residual_mlp_network(feature_sizes: list, input_feature_size: int, device: s
                     previous_layer_output.append(layer_output)
                 else:
                     layer_feature_pulled = layer_output.shape[-1] // layer_output_idx
-                    previous_layer_output.append(layer_output[:, layer_feature_pulled:])
+                    previous_layer_output.append(layer_output[:, :layer_feature_pulled])
 
-        previous_layer_output_features = sum([each.shape[-1] for each in previous_layer_output])
-        if previous_layer_output_features == feature_sizes[0]*2+1:
+        pulled_layer_output_total_features = sum([each.shape[-1] for each in previous_layer_output])
+        if pulled_layer_output_total_features == feature_sizes[0]*2+1:
             return torch.concat(previous_layer_output, dim=-1)
         else:
-            previous_output = torch.zeros(layer_outputs[0].shape[0], feature_sizes[0]*2+1-previous_layer_output_features, device="cuda")
+            previous_output = torch.zeros(layer_outputs[0].shape[0], feature_sizes[0]*2+1-pulled_layer_output_total_features, device="cuda")
             previous_layer_output.append(previous_output)
             return torch.concat(previous_layer_output, dim=-1)
 
