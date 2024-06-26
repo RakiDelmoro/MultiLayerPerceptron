@@ -3,49 +3,36 @@ import statistics
 from layer import linear_layer
 from utils import print_correct_prediction, print_percentile_of_correct_probabilities, print_wrong_prediction
 
-def residual_mlp_network(feature_sizes: list, input_feature_size: int, device: str):
+def residual_mlp_network_v2(feature_sizes: list, input_feature_size: int, device: str):
     layers = []
     parameters = []
     
-    first_layer, first_layer_w, first_layer_b = linear_layer((input_feature_size+239)+1, feature_sizes[0], device, "relu")
+    first_layer, first_layer_w, first_layer_b = linear_layer(input_feature_size, feature_sizes[0], device, "relu")
     layers.append(first_layer)
     parameters.extend([first_layer_w, first_layer_b])
 
     for i in range(len(feature_sizes)-1):
-        input_feature = (feature_sizes[i] * 2) + 1
+        input_feature = feature_sizes[i]
         output_feature = feature_sizes[i+1]
         layer, w, b = linear_layer(input_feature, output_feature, device, "relu")
         layers.append(layer)
         parameters.extend([w, b])
 
-    output_layer, output_layer_w, output_layer_b = linear_layer(feature_sizes[-1]*2+1, 10, device="cuda", activation_function="softmax")
+    output_layer, output_layer_w, output_layer_b = linear_layer(feature_sizes[-1], 10, device="cuda", activation_function="softmax")
     parameters.extend([output_layer_w, output_layer_b])
 
     def pull_feature_from_layer_outputs(layer_outputs: list):
-        # [0, 2, 4, 8, 16, 32, 64, 128]
-        layer_output_idx_to_be_pulled = [0 if i == 0 else 2 * 2**(i-1) for i in range(8)]
-        previous_layer_output = []
-        for layer_output_idx, layer_output_features in enumerate(layer_outputs):
-            is_layer_output_to_be_pulled = layer_output_idx in layer_output_idx_to_be_pulled
+        layer_output_index_to_be_pulled = list(range(0, 900, 100))
+        layer_outputs_pulled = []
+        for layer_output_idx, layer_output_feature in enumerate(layer_outputs):
+            is_layer_output_to_be_pulled = layer_output_idx in [0 if i == 0 else i-1 for i in layer_output_index_to_be_pulled]
             if is_layer_output_to_be_pulled:
-                most_latest_layer_output = layer_output_idx == 0
-                if most_latest_layer_output:
-                    previous_layer_output.append(layer_output_features)
-                else:
-                    layer_feature_pulled = layer_output_features.shape[-1] // layer_output_idx
-                    previous_layer_output.append(layer_output_features[:, :layer_feature_pulled])
+                layer_outputs_pulled.append(layer_output_feature)
 
-        pulled_layer_output_total_features = sum([each.shape[-1] for each in previous_layer_output])
-        if pulled_layer_output_total_features == feature_sizes[0]*2+1:
-            return torch.concat(previous_layer_output, dim=-1)
-        else:
-            previous_output = torch.zeros(layer_outputs[0].shape[0], feature_sizes[0]*2+1-pulled_layer_output_total_features, device="cuda")
-            previous_layer_output.append(previous_output)
-            return torch.concat(previous_layer_output, dim=-1)
+        return torch.sum(torch.stack(layer_outputs_pulled), dim=0)
 
     def forward(input_batch: torch.Tensor):
-        previous_layer_output = torch.zeros((input_batch.shape[0], 1024-input_feature_size), device='cuda')
-        input_for_layer = torch.concat([input_batch, previous_layer_output], dim=-1)
+        input_for_layer = input_batch
         layer_outputs = []
         for layer in layers:
             layer_output = layer(input_for_layer)
@@ -55,6 +42,7 @@ def residual_mlp_network(feature_sizes: list, input_feature_size: int, device: s
         return output_layer(input_for_layer)
 
     def train_for_each_batch(dataloader, loss_function, optimizer):
+        print("Training...")
         losses_for_each_batch = []
         for batch_image, batch_expected in dataloader:
             output_batch = forward(batch_image)
@@ -98,6 +86,7 @@ def residual_mlp_network(feature_sizes: list, input_feature_size: int, device: s
         print(f"Correct percentage: {round(correct_percentage, 1)} Wrong percentage: {round(wrong_percentage, 1)}")
     
     def validate_for_each_batch(dataloader, loss_function):
+        print("Validating...")
         model_outputs = []
         expected = []
         losses_for_each_batch = []
@@ -112,7 +101,7 @@ def residual_mlp_network(feature_sizes: list, input_feature_size: int, device: s
     
     return (train_for_each_batch, validate_for_each_batch), parameters
 
-def model_runner(network, training_loader, validation_loader, number_of_epochs, loss_function, optimizer):
+def model_runner_v2(network, training_loader, validation_loader, number_of_epochs, loss_function, optimizer):
     network_training_forward, network_validation_forward = network
     for epoch in range(number_of_epochs):
         average_loss_for_training_data = network_training_forward(training_loader, loss_function, optimizer)
