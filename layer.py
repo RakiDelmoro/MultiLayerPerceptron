@@ -1,5 +1,6 @@
 import math
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.nn import Parameter
 from torch.nn import ReLU, Softmax
@@ -22,6 +23,7 @@ def linear_layer(in_features: int, out_features: int, device: str, activation_fu
     weight_and_bias_initialization()
 
     def linear_computation(x: torch.Tensor):
-        return act_func(torch.matmul(x, weight.t()) + bias)
+        linear_computation_output = F.linear(x, weight, bias)
+        return act_func(linear_computation_output)
     
     return linear_computation, weight, bias
