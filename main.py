@@ -12,7 +12,7 @@ def main():
     IMAGE_HEIGHT = 28
     BATCH_SIZE = 5000
     LEARNING_RATE = 0.0001
-    HIDDEN_LAYERS = [128] * 10
+    HIDDEN_LAYERS = [128] * 300 
     IMAGE_FEATURE_SIZE = IMAGE_WIDTH * IMAGE_HEIGHT
     RESIDUAL_MODEL, RESIDUAL_MODEL_PARAMETERS = residual_mlp_network(feature_sizes=HIDDEN_LAYERS, input_feature_size=IMAGE_FEATURE_SIZE, device=DEVICE)
     MLP_MODEL, MLP_MODEL_PARAMETERS = mlp_network(feature_sizes=HIDDEN_LAYERS, input_feature_size=IMAGE_FEATURE_SIZE, device=DEVICE)
